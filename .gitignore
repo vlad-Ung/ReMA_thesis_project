@@ -10,6 +10,11 @@ concatenated_metaDMGfinal.tsv
 # Ignore all PNGs.
 *.png
 
+# All tabular data (will make sume subsets).
+*.tsv
+*.csv
+*.xlsx
+
 # Ignore following folders.
 arch_master_thesis/data/OTUs/
 arch_master_thesis/data/st2_sources/
@@ -17,3 +22,5 @@ arch_master_thesis/outputs/
 arch_master_thesis/project/source_tracking/
 /gis/
 /literature_review/
+arch_master_thesis/.vscode/
+/.vscode/

@@ -1,0 +1,138 @@
+# Load packages.
+library(tidyr)
+library(dplyr)
+library(forcats)
+library(scales)
+library(gridExtra)
+library(ggplot2)
+library(purrr)
+library(ggpubr)
+library(pals)
+
+# Load dataframe. I keep absolute file paths so I don't have to keep moving
+# files between /home6 and /scratch.
+df <- read.csv("data/concatenated_metaDMGfinal.tsv", sep = "\t")
+
+# Rename the sample column.
+colnames(df)[colnames(df) == "filename"] <- "sample"
+
+# Shorten sample names. gsub replaces first argument with second argument.
+# So /scratch/s5986052/metaDMG-stuff/lca_outputs/UU0148_aggregated_results.stat
+# becomes UU0148.
+df$sample <- gsub(
+  "/scratch/s5986052/metaDMG-stuff/lca_outputs/",
+  "",
+  df$sample
+)
+df$sample <- gsub(
+  "_aggregated_results.stat",
+  "",
+  df$sample
+)
+
+# Add taxonomic grouping columns.
+df <- df |> mutate(
+  tax_group = case_when(
+    grepl("Viridiplant", taxa_path) ~ "Viridiplantae",
+    grepl("Metazoa", taxa_path) ~ "Metazoa",
+    grepl("Bacteria", taxa_path) ~ "Bacteria",
+    grepl("Archaea", taxa_path) ~ "Archaea",
+    grepl("Fungi", taxa_path) ~ "Fungi"
+  ),
+  site = case_when(
+    sample %in% c(
+      "UU0148", "UU0149", "UU0150", "UU0151", "UU0152",
+      "UU0153", "UU0154"
+    ) ~ "Harelbeke",
+    sample == "UU0291" ~ "Herwen-Hemeling",
+    sample %in% c("UU0393", "UU0396", "UU0398") ~ "Heerlen",
+    sample == "UU0408" ~ "Control"
+  )
+)
+
+df <- df |> mutate(
+  log10_Zfit = log10(Zfit)
+)
+
+# Look at dataset distribution to compare agaist taxonomic grouping.
+p <- ggplot(df, aes(x = log10_Zfit)) +
+  geom_density(fill = "lightblue") +
+  stat_summary(aes(xintercept = ..x.., y = 0),
+    fun = mean, geom = "vline",
+    orientation = "y", color = "red", linetype = "dashed"
+  ) +
+  labs(title = "Distribution of Zfit across dataset, log scale")
+ggsave("outputs/Zfit_distribution.png", plot = p)
+
+# Look at dataset distribution to compare agaist taxonomic grouping.
+p <- ggplot(df, aes(x = log10_Zfit)) +
+  geom_density(fill = "lightblue") +
+  facet_wrap(~tax_group) +
+  stat_summary(aes(xintercept = ..x.., y = 0),
+    fun = mean, geom = "vline",
+    orientation = "y", color = "red", linetype = "dashed"
+  ) +
+  labs(title = "Distribution of Zfit across taxonomic groups, log scale")
+ggsave("outputs/Zfit_taxonomic_distribution.png", plot = p)
+
+# Look at dataset distribution to compare agaist taxonomic grouping.
+p <- ggplot(df, aes(x = log10_Zfit)) +
+  geom_density(fill = "lightblue") +
+  facet_wrap(~site) +
+  stat_summary(aes(xintercept = ..x.., y = 0),
+    fun = mean, geom = "vline",
+    orientation = "y", color = "red", linetype = "dashed"
+  ) +
+  labs(title = "Distribution of Zfit across sites, log scale")
+ggsave("outputs/Zfit_site_distribution.png", plot = p)
+
+summ <- na.omit(df) |>
+  group_by(site, tax_group) +
+  summarise(
+    mean = mean(Zfit),
+    median = median(Zfit),
+    geom_mean = 10^mean(log10(Zfit)),
+    p90 = quantile(Zfit, 0.90),
+    p99 = quantile(Zfit, 0.99),
+    frac_below_mean = mean(Zfit < mean(Zfit)),
+    frac_below_geom_mean = mean(log10_Zfit < mean(log10_Zfit)),
+    fraction_below_2 = mean(Zfit < 2),
+    fraction_below_3 = mean(Zfit < 3),
+    fraction_below_4 = mean(Zfit < 4),
+  )
+write.csv(summ, "outputs/Zfit_summary.csv")
+
+# post-filtering Zfit distribution
+set_1 <- df |> 
+  filter(
+    A > 0.1, mean_rlen > 35, nreads > 50,
+    grepl("\\bgenus\\b", rank)
+  ) |> 
+  mutate(
+    log10_Zfit = log10(Zfit)
+  )
+
+# Look at dataset distribution to compare agaist taxonomic grouping.
+p <- ggplot(set_1, aes(x = log10_Zfit)) +
+  geom_density(fill = "lightblue") +
+  stat_summary(aes(xintercept = ..x.., y = 0),
+    fun = mean, geom = "vline",
+    orientation = "y", color = "red", linetype = "dashed"
+  ) +
+  labs(title = "Distribution of Zfit across the filtered dataset, log scale")
+ggsave("outputs/Zfit_filtered_distribution.png", plot = p)
+
+summ <- na.omit(set_1) |>
+  summarise(
+    mean = mean(Zfit),
+    median = median(Zfit),
+    geom_mean = 10^mean(log10(Zfit)),
+    p90 = quantile(Zfit, 0.90),
+    p99 = quantile(Zfit, 0.99),
+    frac_below_mean = mean(Zfit < mean(Zfit)),
+    frac_below_geom_mean = mean(log10_Zfit < mean(log10_Zfit)),
+    fraction_below_2 = mean(Zfit < 2),
+    fraction_below_3 = mean(Zfit < 3),
+    fraction_below_4 = mean(Zfit < 4),
+  )
+write.csv(summ, "outputs/Zfit_filtered_summary.csv")
