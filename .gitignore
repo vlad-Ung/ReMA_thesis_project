@@ -1,0 +1,19 @@
+# Commit message I use to add commits.
+commit_message.txt
+
+# The big metaDMG output.
+concatenated_metaDMGfinal.tsv
+
+# Ignore all PDFs.
+*.pdf
+
+# Ignore all PNGs.
+*.png
+
+# Ignore following folders.
+arch_master_thesis/data/OTUs/
+arch_master_thesis/data/st2_sources/
+arch_master_thesis/outputs/
+arch_master_thesis/project/source_tracking/
+/gis/
+/literature_review/
