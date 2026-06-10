@@ -1,32 +1,39 @@
-# Load packages.
-library(tidyr)
-library(dplyr)
-library(forcats)
-library(scales)
-library(gridExtra)
-library(ggplot2)
-library(purrr)
-library(ggpubr)
-library(stringr)
-library(tibble)
+# Essentially the OTU workflow, but I'm merging generic GI genera with
+# pathogenic candidates
+# with potential metazoan hosts.
 
-# Load dataframe. I keep absolute file paths so I don't have to keep moving
-# files between /home6 and /scratch.
-df <- read.csv("arch_master_thesis/data/concatenated_metaDMGfinal.tsv", sep = "\t")
+# Import necessary libraries.
+library(dplyr)
+library(mia) # need this for grouping by genus later.
+library(tibble)
+library(tidyr)
+
+
+# Load data.
+data <- read.csv("arch_master_thesis/data/concatenated_metaDMGfinal.tsv", sep = "\t")
 
 # Rename the sample column.
-colnames(df)[colnames(df) == "filename"] <- "sample"
+colnames(data)[colnames(data) == "filename"] <- "sample"
 
 # Shorten sample names. gsub replaces first argument with second argument.
 # So /scratch/s5986052/metaDMG-stuff/lca_outputs/UU0148_aggregated_results.stat
 # becomes UU0148.
-df$sample <- gsub("/scratch/s5986052/metaDMG-stuff/lca_outputs/", "", df$sample)
-df$sample <- gsub("_aggregated_results.stat", "", df$sample)
+data$sample <- gsub(
+  "/scratch/s5986052/metaDMG-stuff/lca_outputs/",
+  "",
+  data$sample
+)
+data$sample <- gsub(
+  "_aggregated_results.stat",
+  "",
+  data$sample
+)
 
 # Rename sample UU0408 control.
-df$sample[df$sample == "UU0408"] <- "Control"
+data$sample[data$sample == "UU0408"] <- "Control"
 
 # Set taxa vector to filter by:
+# These first are the human gut microbiome atlas.
 gi_microbiota <- c(
   "Absiella", "Acetobacter", "Achromobacter", "Acidaminococcus",
   "Actinomyces", "Adlercreutzia", "Aeromonas", "Agathobaculum",
@@ -100,134 +107,126 @@ gi_microbiota <- c(
   "Veillonella", "Victivallis", "Weissella"
 )
 
+
+# Load bacterial pathogens dataframe.
+df_bacteria <- read.csv(
+  "arch_master_thesis/data/bacteria_human_pathogens.csv",
+  sep = ","
+)
+# Remove reference column (too long, dangerous characters, maybe encoding errors).
+df_bacteria <- df_bacteria[, -c(10)]
+
+# Extract bacterial pathogen vector to use as filter later.
+bacteria <- paste0(
+  df_bacteria$genus, " ",
+  df_bacteria$species
+)
+# Remove duplicates
+bacteria <- unique(bacteria)
+
+# Extract helminthes/nematodes pathogen vector to use as filter later.
+helm_nema <- c(
+  "Ascaris lumbricoides", "Trichiuris trichiuria",
+  "Ancylostoma duodenale", "Necator americanicus",
+  "Enterobius vermicularis", "Strongyloides stercoralis",
+  "Taenia solium", "Trichinella spiralis"
+)
+
+# Extract bacterial pathogen vector to use as filter later.
+protozoa <- c(
+  "Entamoeba histolytica", "Giardia intestinalis",
+  "Cyclospora cayetanenensis", "Cryptosporidium parvum",
+  "Cryptosporidium hominis", "Cryptosporidium canis",
+  "Cryptosporidium felis", "Cryptosporidium meleagridis",
+  "Cryptosporidium muris"
+)
+
+# Make combined filter vector with bacteria, helmithes, nematodes and protozoan
+# pathogens.
+pathogens <- append(bacteria, helm_nema) |>
+  append(protozoa) |> 
+  unique()
+
+rm(bacteria, helm_nema, protozoa)
+
+# Add metazoans of interest (e.g. human, horse, pig)
+metazoans <- c(
+  "Homo", "Equus", "Canis", "Sus", "Ovis",
+  "Gallus", "Rattus", "Apodemus"
+)
+
 # Subset based on authentication thresholding.
-set_1 <- df |> filter(
+set_1 <- data |> filter(
   A > 0.1, mean_rlen > 35, nreads > 50,
   grepl("\\bgenus\\b", taxa_path)
 )
 
 # Add control sample back to the set
 # (it got filtered out by authentication thresholding).
-control_set <- df |> filter(
-  nreads > 50, mean_rlen > 35,
+control_set <- data |> filter(
+  mean_rlen > 35, nreads > 50,
   sample == "Control",
-  grepl("\\bgenus\\b", taxa_path)
+  grepl("\\genus\\b", taxa_path)
 )
 set_1 <- rbind(set_1, control_set)
 
-# Filter out species in taxa_vector.
-set_1 <- set_1 |>
+pathogens <- set_1 |> 
   filter(
-    name %in% gi_microbiota
+    name %in% pathogens
   )
 
-# Summarise.
-set_1 <- set_1 |> 
-  group_by(sample, name) |> 
-  summarise(nreads = sum(nreads), .groups = "drop_last") |> 
-  mutate(props = nreads / sum(nreads)) |> 
+pathogens <- pathogens |>
+  group_by(sample, name) |>
+  summarise(
+    nreads = sum(nreads)
+  ) |>
   ungroup()
 
-# Pivot to wide matrix for clustering.
-mat <- set_1 |>
-  select(sample, name, props) |>
-  pivot_wider(names_from = name, values_from = props, values_fill = 0) |>
-  column_to_rownames("sample") |>
-  as.matrix()
+pathogens <- pathogens |>
+  pivot_wider(
+    names_from = sample,
+    values_from = nreads
+  ) |>
+  mutate(across(-name, ~ replace_na(.x, 0)))
 
-# Cluster samples and taxa. Similar samples in terms of taxonomic composition
-# stay close to each other.
-sample_order <- hclust(dist(mat))$order
-taxon_order <- hclust(dist(t(mat)))$order # t(mat) transposes the columns
+readr::write_tsv(pathogens, "arch_master_thesis/data/OTUs/pathogen_OTU.csv")
 
-# Pull ordered levels
-taxon_levels <- colnames(mat)[taxon_order]
-
-# Put Control at the end in sample levels.
-sample_levels <- c(
-  "UU0148", "UU0149", "UU0150", "UU0151",
-  "UU0152", "UU0153", "UU0154", "UU0291",
-  "UU0393", "UU0396", "UU0398", "Control"
+gi_microbiota <- set_1 |> filter(
+  name %in% gi_microbiota
 )
 
-# Apply ordering to long-format data
-set_1_ordered <- set_1 |>
-  mutate(
-    sample = factor(sample, levels = sample_levels),
-    name   = factor(name, levels = sort(taxon_levels, decreasing = TRUE))
-  )
+gi_microbiota <- gi_microbiota |>
+  group_by(sample, name) |>
+  summarise(
+    nreads = sum(nreads)
+  ) |>
+  ungroup()
 
-# Plot
-p <- ggplot(set_1_ordered, aes(x = sample, y = name, fill = props)) +
-  geom_tile() +
-  scale_fill_gradientn(
-    colours = viridis::viridis(10), #10% increments
-    labels  = scales::percent,
-    name    = "Relative\nabundance"
-  ) +
-  labs(x = NULL, y = NULL) +
-  theme_minimal() +
-  theme(
-    axis.text.x  = element_text(angle = 45, hjust = 1, size = 9),
-    axis.text.y  = element_text(size = 8),
-    legend.text  = element_text(size = 8),
-    panel.grid   = element_blank()
-  ) +
-  labs(title = "Ancient GI microbiota abundances across samples + control")
-ggsave("arch_master_thesis/outputs/GI_bacteria_props.png",
-  plot = p, width = 190,
-  units = "mm", dpi = 300
+gi_microbiota <- gi_microbiota |>
+  pivot_wider(
+    names_from = sample,
+    values_from = nreads
+  ) |>
+  mutate(across(-name, ~ replace_na(.x, 0)))
+
+readr::write_tsv(gi_microbiota, "arch_master_thesis/data/OTUs/gi_microbiota_OTU.csv")
+
+metazoans <- set_1 |> filter(
+  name %in% metazoans
 )
 
-# Also plot the reads.
-# Pivot to wide matrix for clustering.
-mat <- set_1 |>
-  select(sample, name, nreads) |>
-  pivot_wider(names_from = name, values_from = nreads, values_fill = 0) |>
-  column_to_rownames("sample") |>
-  as.matrix()
+metazoans <- metazoans |>
+  group_by(sample, name) |>
+  summarise(
+    nreads = sum(nreads)
+  ) |>
+  ungroup()
 
-# Cluster samples and taxa. Similar samples in terms of taxonomic composition
-# stay close to each other.
-sample_order <- hclust(dist(mat))$order
-taxon_order <- hclust(dist(t(mat)))$order # t(mat) transposes the columns
+metazoans <- metazoans |>
+  pivot_wider(
+    names_from = sample,
+    values_from = nreads
+  ) |>
+  mutate(across(-name, ~ replace_na(.x, 0)))
 
-# Pull ordered levels
-taxon_levels <- colnames(mat)[taxon_order]
-
-# Put Control at the end in sample levels.
-sample_levels <- c(
-  "UU0148", "UU0149", "UU0150", "UU0151",
-  "UU0152", "UU0153", "UU0154", "UU0291",
-  "UU0393", "UU0396", "UU0398", "Control"
-)
-
-# Apply ordering to long-format data
-set_1_ordered <- set_1 |>
-  mutate(
-    sample = factor(sample, levels = sample_levels),
-    name   = factor(name, levels = sort(taxon_levels, decreasing = TRUE))
-  )
-
-# Plot
-p <- ggplot(set_1_ordered, aes(x = sample, y = name, fill = nreads)) +
-  geom_tile() +
-  scale_fill_gradientn(
-    colours = viridis::viridis(10), # 10% increments
-    name    = "Number of\nreads"
-  ) +
-  labs(x = NULL, y = NULL) +
-  theme_minimal() +
-  theme(
-    axis.text.x  = element_text(angle = 45, hjust = 1, size = 9),
-    axis.text.y  = element_text(size = 8),
-    legend.text  = element_text(size = 8),
-    panel.grid   = element_blank()
-  ) +
-  labs(title = "Ancient GI microbiota reads per sample + control")
-ggsave("arch_master_thesis/outputs/GI_bacteria_nreads.png",
-  plot = p, width = 190,
-  units = "mm", dpi = 300
-)
-
-length(unique(set_1_ordered$name))
+readr::write_tsv(metazoans, "arch_master_thesis/data/OTUs/metazoans_OTU.csv")

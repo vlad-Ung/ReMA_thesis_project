@@ -29,14 +29,15 @@ df$sample[df$sample == "UU0408"] <- "Control"
 # Subset based on authentication metrics:
 set_1 <- df |> filter(
   A > 0.1, mean_rlen > 35, nreads > 50,
-  grepl("\\bspecies\\b", rank)
+  grepl("\\bgenus\\b", taxa_path)
 )
 
 # subset control to add it manually to set_1.
 control_set <- df |> filter(
   sample == "Control",
   nreads > 50,
-  mean_rlen > 35
+  mean_rlen > 35,
+  grepl("\\bgenus\\b", taxa_path)
 )
 
 # Append control_set to set_1.
