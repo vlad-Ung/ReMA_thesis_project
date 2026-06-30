@@ -76,6 +76,7 @@ for i, file in enumerate(files):
     # Plot bibplots.
     g = ggplot(pcoa_embed, aes(x="PC1", y="PC2", color="Site"))
     g += geom_point(size=3)
+    g += stat_ellipse(aes(fill="Site"), type="norm")
     g += geom_label(
         aes(label="sample"),  # use aes() instead of passing the Series directly
         nudge_x=0.01,  # use small fractions of your actual axis range

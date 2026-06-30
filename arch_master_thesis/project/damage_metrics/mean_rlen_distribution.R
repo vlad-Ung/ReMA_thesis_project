@@ -11,13 +11,13 @@ library(pals)
 
 # Load dataframe. I keep absolute file paths so I don't have to keep moving
 # files between /home6 and /scratch.
-df <- read.csv("data/concatenated_metaDMGfinal.tsv", sep = "\t")
+df <- read.csv("arch_master_thesis/data/concatenated_metaDMGfinal.tsv", sep = "\t")
 
 # Rename the sample column.
 colnames(df)[colnames(df) == "filename"] <- "sample"
 
 # Shorten sample names. gsub replaces first argument with second argument.
-# So /scratch/s5986052/metaDMG-stuff/lca_outputs/UU0148_aggregated_results.stat
+# So /scratch/s5986052/metaDMG-stuff/lca_arch_master_thesis/outputs/UU0148_aggregated_results.stat
 # becomes UU0148.
 df$sample <- gsub(
   "/scratch/s5986052/metaDMG-stuff/lca_outputs/",
@@ -62,8 +62,8 @@ p <- ggplot(df, aes(x = log10_mean_rlen)) + # there are na's.
     orientation = "y", color = "red", linetype = "dashed"
   ) +
   theme_minimal() +
-  labs(title = "Distribution of mean_rlen across dataset, log scale")
-ggsave("outputs/mean_rlen_distribution.png", plot = p)
+  theme(text = element_text(size = 10))
+ggsave("arch_master_thesis/outputs/mean_rlen_distribution.png", plot = p)
 
 # Look at dataset distribution to compare agaist taxonomic grouping.
 p <- ggplot(df, aes(x = log10_mean_rlen)) + # there are na's.
@@ -74,8 +74,8 @@ p <- ggplot(df, aes(x = log10_mean_rlen)) + # there are na's.
     orientation = "y", color = "red", linetype = "dashed"
   ) +
   theme_minimal() +
-  labs(title = "Distribution of mean_rlen across taxonomic groups, log scale")
-ggsave("outputs/mean_rlen_taxonomic_distribution.png", plot = p)
+  theme(text = element_text(size = 10))
+ggsave("arch_master_thesis/outputs/mean_rlen_taxonomic_distribution.png", plot = p)
 
 # Look at dataset distribution to compare agaist taxonomic grouping.
 p <- ggplot(df, aes(x = log10_mean_rlen)) + # there are na's.
@@ -86,11 +86,11 @@ p <- ggplot(df, aes(x = log10_mean_rlen)) + # there are na's.
     orientation = "y", color = "red", linetype = "dashed"
   ) +
   theme_minimal() +
-  labs(title = "Distribution of mean_rlen across sites, log scale")
-ggsave("outputs/mean_rlen_site_distribution.png", plot = p)
+  theme(text = element_text(size = 10))
+ggsave("arch_master_thesis/outputs/mean_rlen_site_distribution.png", plot = p)
 
 summ <- df |>
-  group_by(site, tax_group) |> 
+  group_by(site, tax_group) |>
   summarise(
     mean = mean(mean_rlen),
     sd = sd(mean_rlen),
@@ -105,4 +105,6 @@ summ <- df |>
     frac_below_100 = mean(mean_rlen < 100),
     frac_below_geom_mean = mean(log10_mean_rlen < mean(log10_mean_rlen))
   )
-write.csv(summ, "outputs/mean_rlen_summary.csv")
+write.csv(summ, "arch_master_thesis/outputs/mean_rlen_summary.csv")
+
+unique(df$sample)

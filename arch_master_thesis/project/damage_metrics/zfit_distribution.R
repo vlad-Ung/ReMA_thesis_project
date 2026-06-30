@@ -11,7 +11,7 @@ library(pals)
 
 # Load dataframe. I keep absolute file paths so I don't have to keep moving
 # files between /home6 and /scratch.
-df <- read.csv("data/concatenated_metaDMGfinal.tsv", sep = "\t")
+df <- read.csv("arch_master_thesis/data/concatenated_metaDMGfinal.tsv", sep = "\t")
 
 # Rename the sample column.
 colnames(df)[colnames(df) == "filename"] <- "sample"
@@ -61,8 +61,9 @@ p <- ggplot(df, aes(x = log10_Zfit)) +
     fun = mean, geom = "vline",
     orientation = "y", color = "red", linetype = "dashed"
   ) +
-  labs(title = "Distribution of Zfit across dataset, log scale")
-ggsave("outputs/Zfit_distribution.png", plot = p)
+  theme_minimal() +
+  theme(text = element_text(size = 10))
+ggsave("arch_master_thesis/outputs/Zfit_distribution.png", plot = p)
 
 # Look at dataset distribution to compare agaist taxonomic grouping.
 p <- ggplot(df, aes(x = log10_Zfit)) +
@@ -72,8 +73,9 @@ p <- ggplot(df, aes(x = log10_Zfit)) +
     fun = mean, geom = "vline",
     orientation = "y", color = "red", linetype = "dashed"
   ) +
-  labs(title = "Distribution of Zfit across taxonomic groups, log scale")
-ggsave("outputs/Zfit_taxonomic_distribution.png", plot = p)
+  theme_minimal() +
+  theme(text = element_text(size = 10))
+ggsave("arch_master_thesis/outputs/Zfit_taxonomic_distribution.png", plot = p)
 
 # Look at dataset distribution to compare agaist taxonomic grouping.
 p <- ggplot(df, aes(x = log10_Zfit)) +
@@ -83,11 +85,12 @@ p <- ggplot(df, aes(x = log10_Zfit)) +
     fun = mean, geom = "vline",
     orientation = "y", color = "red", linetype = "dashed"
   ) +
-  labs(title = "Distribution of Zfit across sites, log scale")
-ggsave("outputs/Zfit_site_distribution.png", plot = p)
+  theme_minimal() +
+  theme(text = element_text(size = 10))
+ggsave("arch_master_thesis/outputs/Zfit_site_distribution.png", plot = p)
 
 summ <- na.omit(df) |>
-  group_by(site, tax_group) +
+  group_by(site, tax_group) |> 
   summarise(
     mean = mean(Zfit),
     median = median(Zfit),
@@ -100,14 +103,14 @@ summ <- na.omit(df) |>
     fraction_below_3 = mean(Zfit < 3),
     fraction_below_4 = mean(Zfit < 4),
   )
-write.csv(summ, "outputs/Zfit_summary.csv")
+write.csv(summ, "arch_master_thesis/outputs/Zfit_summary.csv")
 
 # post-filtering Zfit distribution
-set_1 <- df |> 
+set_1 <- df |>
   filter(
     A > 0.1, mean_rlen > 35, nreads > 50,
     grepl("\\bgenus\\b", rank)
-  ) |> 
+  ) |>
   mutate(
     log10_Zfit = log10(Zfit)
   )
@@ -119,10 +122,11 @@ p <- ggplot(set_1, aes(x = log10_Zfit)) +
     fun = mean, geom = "vline",
     orientation = "y", color = "red", linetype = "dashed"
   ) +
-  labs(title = "Distribution of Zfit across the filtered dataset, log scale")
-ggsave("outputs/Zfit_filtered_distribution.png", plot = p)
+  theme_minimal() +
+  theme(text = element_text(size = 10))
+ggsave("arch_master_thesis/outputs/Zfit_filtered_distribution.png", plot = p)
 
-summ <- na.omit(set_1) |>
+summ <- set_1 |>
   summarise(
     mean = mean(Zfit),
     median = median(Zfit),
@@ -135,4 +139,4 @@ summ <- na.omit(set_1) |>
     fraction_below_3 = mean(Zfit < 3),
     fraction_below_4 = mean(Zfit < 4),
   )
-write.csv(summ, "outputs/Zfit_filtered_summary.csv")
+write.csv(summ, "arch_master_thesis/outputs/Zfit_filtered_summary.csv")

@@ -11,7 +11,7 @@ library(pals)
 
 # Load dataframe. I keep absolute file paths so I don't have to keep moving
 # files between /home6 and /scratch.
-df <- read.csv("data/concatenated_metaDMGfinal.tsv", sep = "\t")
+df <- read.csv("arch_master_thesis/data/concatenated_metaDMGfinal.tsv", sep = "\t")
 
 # Rename the sample column.
 colnames(df)[colnames(df) == "filename"] <- "sample"
@@ -56,15 +56,15 @@ df <- df |> mutate(
 )
 
 # Look at dataset distribution to compare agaist taxonomic grouping.
-p <- ggplot(df, aes(x = log10_nreads)) + 
+p <- ggplot(df, aes(x = log10_nreads)) +
   geom_density(fill = "lightblue") +
   stat_summary(aes(xintercept = ..x.., y = 0),
     fun = mean, geom = "vline",
     orientation = "y", color = "red", linetype = "dashed"
   ) +
   theme_minimal() +
-  labs(title = "Distribution of nreads across dataset, log scale")
-ggsave("outputs/nreads_distribution.png", plot = p)
+  theme(text = element_text(size = 10))
+ggsave("arch_master_thesis/outputs/nreads_distribution.png", plot = p)
 
 # Look at dataset distribution to compare agaist taxonomic grouping.
 p <- ggplot(df, aes(x = log10_nreads)) +
@@ -75,8 +75,8 @@ p <- ggplot(df, aes(x = log10_nreads)) +
     orientation = "y", color = "red", linetype = "dashed"
   ) +
   theme_minimal() +
-  labs(title = "Distribution of nreads across taxonomic groups, log scale")
-ggsave("outputs/nreads_taxonomic_distribution.png", plot = p)
+  theme(text = element_text(size = 10))
+ggsave("arch_master_thesis/outputs/nreads_taxonomic_distribution.png", plot = p)
 
 # Look at dataset distribution to compare agaist taxonomic grouping.
 p <- ggplot(df, aes(x = log10_nreads)) +
@@ -87,21 +87,21 @@ p <- ggplot(df, aes(x = log10_nreads)) +
     orientation = "y", color = "red", linetype = "dashed"
   ) +
   theme_minimal() +
-  labs(title = "Distribution of nreads across sites, log scale")
-ggsave("outputs/nreads_site_distribution.png", plot = p)
+  theme(text = element_text(size = 10))
+ggsave("arch_master_thesis/outputs/nreads_site_distribution.png", plot = p)
 
 summ <- df |>
-  group_by(site, tax_group) |> 
+  group_by(site, tax_group) |>
   summarise(
-    mean_nreads   = mean(nreads),
+    mean_nreads = mean(nreads),
     sd = sd(nreads),
     median_nreads = median(nreads),
     geom_mean = 10^mean(log10_nreads),
-    p90_nreads    = quantile(nreads, 0.90),
-    p99_nreads    = quantile(nreads, 0.99),
+    p90_nreads = quantile(nreads, 0.90),
+    p99_nreads = quantile(nreads, 0.99),
     frac_below_mean = mean(nreads < mean(nreads)),
     frac_below_geom_mean = mean(log10_nreads < mean(log10_nreads)),
     frac_below_100 = mean(nreads < 100),
     frac_below_50 = mean(nreads < 50)
   )
-write.csv(summ, "outputs/nreads_summary.csv")
+write.csv(summ, "arch_master_thesis/outputs/nreads_summary.csv")

@@ -100,6 +100,12 @@ gi_microbiota <- c(
   "Veillonella", "Victivallis", "Weissella"
 )
 
+# Write taxonomic filter used
+readr::write_tsv(as.data.frame(gi_microbiota),
+  "arch_master_thesis/outputs/gi_microbiota.csv",
+  col_names = FALSE
+)
+
 # Subset based on authentication thresholding.
 set_1 <- df |> filter(
   A > 0.1, mean_rlen > 35, nreads > 50,
@@ -122,26 +128,14 @@ set_1 <- set_1 |>
   )
 
 # Summarise.
-set_1 <- set_1 |> 
-  group_by(sample, name) |> 
-  summarise(nreads = sum(nreads), .groups = "drop_last") |> 
-  mutate(props = nreads / sum(nreads)) |> 
+set_1 <- set_1 |>
+  group_by(sample, name) |>
+  summarise(nreads = sum(nreads), .groups = "drop_last") |>
+  mutate(props = nreads / sum(nreads)) |>
   ungroup()
 
-# Pivot to wide matrix for clustering.
-mat <- set_1 |>
-  select(sample, name, props) |>
-  pivot_wider(names_from = name, values_from = props, values_fill = 0) |>
-  column_to_rownames("sample") |>
-  as.matrix()
-
-# Cluster samples and taxa. Similar samples in terms of taxonomic composition
-# stay close to each other.
-sample_order <- hclust(dist(mat))$order
-taxon_order <- hclust(dist(t(mat)))$order # t(mat) transposes the columns
-
-# Pull ordered levels
-taxon_levels <- colnames(mat)[taxon_order]
+# Harcode observations and sample factor levels for ordering.
+taxon_levels <- sort(unique(set_1$name), decreasing = TRUE) # get names alphabecically
 
 # Put Control at the end in sample levels.
 sample_levels <- c(
@@ -150,18 +144,18 @@ sample_levels <- c(
   "UU0393", "UU0396", "UU0398", "Control"
 )
 
-# Apply ordering to long-format data
+# Apply ordering to set_1.
 set_1_ordered <- set_1 |>
   mutate(
     sample = factor(sample, levels = sample_levels),
-    name   = factor(name, levels = sort(taxon_levels, decreasing = TRUE))
+    name   = factor(name, levels = taxon_levels) # sort(name, decreasing = TRUE))
   )
 
 # Plot
 p <- ggplot(set_1_ordered, aes(x = sample, y = name, fill = props)) +
   geom_tile() +
   scale_fill_gradientn(
-    colours = viridis::viridis(10), #10% increments
+    colours = viridis::viridis(10), # 10% increments
     labels  = scales::percent,
     name    = "Relative\nabundance"
   ) +
@@ -179,37 +173,7 @@ ggsave("arch_master_thesis/outputs/GI_bacteria_props.png",
   units = "mm", dpi = 300
 )
 
-# Also plot the reads.
-# Pivot to wide matrix for clustering.
-mat <- set_1 |>
-  select(sample, name, nreads) |>
-  pivot_wider(names_from = name, values_from = nreads, values_fill = 0) |>
-  column_to_rownames("sample") |>
-  as.matrix()
-
-# Cluster samples and taxa. Similar samples in terms of taxonomic composition
-# stay close to each other.
-sample_order <- hclust(dist(mat))$order
-taxon_order <- hclust(dist(t(mat)))$order # t(mat) transposes the columns
-
-# Pull ordered levels
-taxon_levels <- colnames(mat)[taxon_order]
-
-# Put Control at the end in sample levels.
-sample_levels <- c(
-  "UU0148", "UU0149", "UU0150", "UU0151",
-  "UU0152", "UU0153", "UU0154", "UU0291",
-  "UU0393", "UU0396", "UU0398", "Control"
-)
-
-# Apply ordering to long-format data
-set_1_ordered <- set_1 |>
-  mutate(
-    sample = factor(sample, levels = sample_levels),
-    name   = factor(name, levels = sort(taxon_levels, decreasing = TRUE))
-  )
-
-# Plot
+# Plot nreads.
 p <- ggplot(set_1_ordered, aes(x = sample, y = name, fill = nreads)) +
   geom_tile() +
   scale_fill_gradientn(
@@ -230,4 +194,16 @@ ggsave("arch_master_thesis/outputs/GI_bacteria_nreads.png",
   units = "mm", dpi = 300
 )
 
-length(unique(set_1_ordered$name))
+general_stats <- set_1 |>
+  group_by(sample) |>
+  summarise(n = n_distinct(name)) |>
+  mutate(
+    sample_props = n / sum(n),
+    filter_props = n / length(gi_microbiota)
+  )
+
+n_distinct(set_1$name)
+length(gi_microbiota)
+n_distinct(set_1$name) / length(gi_microbiota)
+
+print(unique(set_1_ordered$name[set_1_ordered$sample == "UU0398"]))
